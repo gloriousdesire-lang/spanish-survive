@@ -2,24 +2,45 @@ import { useState, useEffect, useCallback } from "react";
 
 // ── Design Tokens ─────────────────────────────────────────────────────────────
 const C = {
-  bg: "#F7F5F2",
-  surface: "#FFFFFF",
-  border: "#E8E4DE",
-  borderLight: "#F0EDE8",
-  accent: "#FF5C35",
-  accentDark: "#D94420",
-  blue: "#2D6BE4",
-  blueLight: "#EEF3FD",
-  green: "#22C55E",
-  greenLight: "#F0FDF4",
-  yellow: "#F59E0B",
-  yellowLight: "#FFFBEB",
-  text: "#1A1612",
-  textMid: "#6B6560",
-  textLight: "#A09890",
-  shadow: "0 2px 12px rgba(0,0,0,0.07)",
-  shadowMd: "0 4px 24px rgba(0,0,0,0.10)",
+  bg: "#F7F5F2", surface: "#FFFFFF", border: "#E8E4DE", borderLight: "#F0EDE8",
+  accent: "#FF5C35", accentDark: "#D94420",
+  blue: "#2D6BE4", blueLight: "#EEF3FD",
+  green: "#22C55E", greenLight: "#F0FDF4",
+  yellow: "#F59E0B", yellowLight: "#FFFBEB",
+  text: "#1A1612", textMid: "#6B6560", textLight: "#A09890",
+  shadow: "0 2px 12px rgba(0,0,0,0.07)", shadowMd: "0 4px 24px rgba(0,0,0,0.10)",
 };
+
+// ── Speech (browser TTS) ──────────────────────────────────────────────────────
+function speak(text, lang) {
+  if (typeof window === "undefined" || !window.speechSynthesis) return;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang || "es-ES";
+    u.rate = 0.92;
+    u.pitch = 1;
+    const voices = window.speechSynthesis.getVoices();
+    const match = voices.find(v => v.lang && v.lang.toLowerCase().startsWith((lang||"es").slice(0,2).toLowerCase()));
+    if (match) u.voice = match;
+    window.speechSynthesis.speak(u);
+  } catch (e) { /* ignore */ }
+}
+
+function SpeakBtn({ text, lang = "es-ES", size = 32, style: s = {} }) {
+  return (
+    <button
+      onClick={(e)=>{ e.stopPropagation(); speak(text, lang); }}
+      aria-label="Play pronunciation"
+      style={{
+        width:size, height:size, borderRadius:size/2, background:C.blueLight,
+        color:C.blue, fontSize:size*0.5, display:"flex", alignItems:"center",
+        justifyContent:"center", border:`1px solid ${C.blue}33`, flexShrink:0, ...s
+      }}>
+      🔊
+    </button>
+  );
+}
 
 // ── Mission Bank (20 missions, 3 levels) ──────────────────────────────────────
 const ALL_MISSIONS = [
@@ -30,7 +51,6 @@ const ALL_MISSIONS = [
   { id:5, level:1, title:"Greet Neighbours", emoji:"👋", scene:"You pass your neighbour in the stairwell.", pressure:"They smile and say something.", phrases:[{es:"Buenos días",en:"Good morning"},{es:"Buenas tardes",en:"Good afternoon"},{es:"¿Cómo está usted?",en:"How are you?"},{es:"Soy su nuevo vecino",en:"I'm your new neighbour"},{es:"Encantado de conocerle",en:"Pleased to meet you"}], fallback:{es:"Buenos días",en:"Good morning"} },
   { id:6, level:1, title:"At the Pharmacy", emoji:"💊", scene:"You have a headache.", pressure:"The pharmacist asks what you need.", phrases:[{es:"Me duele la cabeza",en:"My head hurts"},{es:"¿Tiene algo para el dolor?",en:"Do you have something for pain?"},{es:"¿Sin receta?",en:"Without a prescription?"},{es:"¿Cuántas veces al día?",en:"How many times a day?"},{es:"¿Cuánto cuesta?",en:"How much is it?"}], fallback:{es:"Para el dolor, por favor",en:"For pain, please"} },
   { id:7, level:1, title:"Order Food", emoji:"🍽️", scene:"Sunday lunch at a local restaurant.", pressure:"The waiter arrives at your table.", phrases:[{es:"¿Tienen menú del día?",en:"Do you have a set menu?"},{es:"¿Qué recomienda?",en:"What do you recommend?"},{es:"Sin gluten, por favor",en:"Gluten-free, please"},{es:"Otro vino, por favor",en:"Another wine, please"},{es:"Está delicioso",en:"It's delicious"}], fallback:{es:"El menú, por favor",en:"The menu, please"} },
-  // Level 2
   { id:8, level:2, title:"Call About a Flat", emoji:"🏠", scene:"You found a listing on Idealista.", pressure:"The landlord picks up.", phrases:[{es:"¿Está disponible el piso?",en:"Is the flat available?"},{es:"¿Cuál es el precio mensual?",en:"What is the monthly rent?"},{es:"¿Están incluidos los gastos?",en:"Are bills included?"},{es:"¿Cuándo puedo verlo?",en:"When can I view it?"},{es:"¿Se admiten mascotas?",en:"Are pets allowed?"}], fallback:{es:"¿Está disponible?",en:"Is it available?"} },
   { id:9, level:2, title:"At the Bank", emoji:"🏦", scene:"You need to open a Spanish bank account.", pressure:"The advisor calls your number.", phrases:[{es:"Quiero abrir una cuenta",en:"I want to open an account"},{es:"¿Qué documentos necesito?",en:"What documents do I need?"},{es:"Tengo el NIE",en:"I have my NIE"},{es:"¿Cuánto tarda?",en:"How long does it take?"},{es:"¿Tiene tarjeta de débito?",en:"Do you have a debit card?"}], fallback:{es:"Quiero una cuenta",en:"I want an account"} },
   { id:10, level:2, title:"Doctor's Visit", emoji:"🏥", scene:"You're at the Centro de Salud.", pressure:"The receptionist asks what's wrong.", phrases:[{es:"Tengo una cita",en:"I have an appointment"},{es:"Me duele la cabeza",en:"My head hurts"},{es:"Tengo fiebre",en:"I have a fever"},{es:"¿Puedo tener la receta?",en:"Can I have the prescription?"},{es:"¿Dónde está la farmacia?",en:"Where is the pharmacy?"}], fallback:{es:"Necesito un médico",en:"I need a doctor"} },
@@ -38,7 +58,6 @@ const ALL_MISSIONS = [
   { id:12, level:2, title:"Post Office", emoji:"📦", scene:"You need to send a package.", pressure:"You're at the counter.", phrases:[{es:"Quiero enviar este paquete",en:"I want to send this package"},{es:"¿Cuánto tarda en llegar?",en:"How long will it take?"},{es:"¿Tiene seguro?",en:"Is it insured?"},{es:"Correo urgente",en:"Express mail"},{es:"¿Me da el comprobante?",en:"Can I have the receipt?"}], fallback:{es:"Enviar esto",en:"Send this"} },
   { id:13, level:2, title:"Hairdresser", emoji:"✂️", scene:"First haircut in Spain.", pressure:"The stylist asks what you want.", phrases:[{es:"Solo un poco, por favor",en:"Just a little, please"},{es:"Los lados cortos",en:"Short on the sides"},{es:"Igual que antes",en:"Same as before"},{es:"¿Cuánto cuesta?",en:"How much is it?"},{es:"Está perfecto",en:"It's perfect"}], fallback:{es:"Poco, gracias",en:"A little, thanks"} },
   { id:14, level:2, title:"Complain Politely", emoji:"😤", scene:"Your apartment has no hot water.", pressure:"You call the landlord.", phrases:[{es:"Hay un problema en el piso",en:"There's a problem in the flat"},{es:"No hay agua caliente",en:"There's no hot water"},{es:"Lleva dos días así",en:"It's been like this two days"},{es:"¿Cuándo puede venir?",en:"When can you come?"},{es:"Necesito una solución hoy",en:"I need a solution today"}], fallback:{es:"Hay un problema",en:"There's a problem"} },
-  // Level 3
   { id:15, level:3, title:"Job Interview", emoji:"💼", scene:"Interview at a luxury boutique in Valencia.", pressure:"The manager asks about your experience.", phrases:[{es:"Tengo diez años de experiencia",en:"I have ten years of experience"},{es:"Trabajo bien bajo presión",en:"I work well under pressure"},{es:"Me adapto rápidamente",en:"I adapt quickly"},{es:"¿Cuáles son los siguientes pasos?",en:"What are the next steps?"},{es:"Estoy muy motivado",en:"I'm very motivated"}], fallback:{es:"Tengo experiencia",en:"I have experience"} },
   { id:16, level:3, title:"Sign a Lease", emoji:"📋", scene:"You're signing your Valencia apartment contract.", pressure:"The landlord explains the terms.", phrases:[{es:"¿Puedo leerlo antes de firmar?",en:"Can I read it before signing?"},{es:"¿Cuánto es la fianza?",en:"How much is the deposit?"},{es:"¿Cuándo puedo entrar?",en:"When can I move in?"},{es:"¿Quién paga las reparaciones?",en:"Who pays for repairs?"},{es:"Necesito pensarlo",en:"I need to think about it"}], fallback:{es:"¿Puedo leerlo?",en:"Can I read it?"} },
   { id:17, level:3, title:"Negotiate a Deal", emoji:"🤝", scene:"Sourcing a wholesale supplier in Spain.", pressure:"They quote you a price.", phrases:[{es:"¿Puede hacer un mejor precio?",en:"Can you do a better price?"},{es:"Compramos en grandes cantidades",en:"We buy in large quantities"},{es:"¿Cuáles son las condiciones?",en:"What are the terms?"},{es:"Necesitamos exclusividad",en:"We need exclusivity"},{es:"Lo consultaré con mi equipo",en:"I'll check with my team"}], fallback:{es:"¿Mejor precio?",en:"Better price?"} },
@@ -58,48 +77,46 @@ function getMissions(xp, saved) {
     id:"custom", level:1, title:"My Phrases", emoji:"📖",
     scene:"Phrases you saved from the translator.",
     pressure:"Practice what you actually need.",
-    phrases: saved,
-    fallback: saved[0] || {es:"Por favor",en:"Please"}
+    phrases: saved, fallback: saved[0] || {es:"Por favor",en:"Please"}
   }] : [];
   return [...base, ...custom];
 }
 
+// ── Translation (free, browser-friendly) ──────────────────────────────────────
 async function translateText(text, dir) {
-  const [from, to] = dir === "en→es" ? ["English","Spanish (Spain)"] : ["Spanish","English"];
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role:"user", content:`Translate this ${from} text to ${to}. Return ONLY the translation, nothing else.\n\n${text}` }]
-    })
-  });
+  const langpair = dir === "en→es" ? "en|es" : "es|en";
+  const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error("API error");
   const d = await res.json();
-  return d.content?.[0]?.text?.trim() || "";
+  if (d.responseStatus && d.responseStatus !== 200 && d.responseStatus !== "200") {
+    throw new Error(d.responseDetails || "Translation error");
+  }
+  return (d.responseData && d.responseData.translatedText) || "";
 }
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-  body{background:#F7F5F2;font-family:'DM Sans',sans-serif;}
-  button,textarea,input{font-family:'DM Sans',sans-serif;}
-  textarea::placeholder{color:#C0B8B0;}
-  button{cursor:pointer;border:none;}
-  @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-  @keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-  .fu{animation:fadeUp 0.28s ease forwards;}
-  .si{animation:slideIn 0.22s ease forwards;}
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display&display=swap');
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:#F7F5F2;font-family:'DM Sans',sans-serif;}
+button,textarea,input{font-family:'DM Sans',sans-serif;}
+textarea::placeholder{color:#C0B8B0;}
+button{cursor:pointer;border:none;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.fu{animation:fadeUp 0.28s ease forwards;}
+.si{animation:slideIn 0.22s ease forwards;}
 `;
 
 function Pill({label, color}) {
   return <span style={{display:"inline-block",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,background:color+"1A",color}}>{label}</span>;
 }
+
 function PBtn({children,onClick,disabled,color=C.accent,style:s={}}) {
   return <button onClick={onClick} disabled={disabled} style={{width:"100%",padding:"15px",borderRadius:14,background:disabled?"#E8E4DE":color,color:disabled?C.textLight:"white",fontSize:15,fontWeight:600,boxShadow:disabled?"none":`0 4px 18px ${color}44`,transition:"all 0.15s",...s}}>{children}</button>;
 }
+
 function GBtn({children,onClick,style:s={}}) {
   return <button onClick={onClick} style={{width:"100%",padding:"13px",borderRadius:14,background:"transparent",color:C.textMid,fontSize:14,fontWeight:500,border:`1.5px solid ${C.border}`,transition:"all 0.15s",...s}}>{children}</button>;
 }
@@ -118,7 +135,6 @@ function SurviveTab({missions, xp, setXp, streak, setStreak}) {
   const answer = yes => { if(yes){setXp(x=>x+10);setStreak(s=>s+1);next();}else{setStreak(0);setPhase("fallback");} };
 
   if(!missions.length) return <div style={{padding:"60px 20px",textAlign:"center",color:C.textMid}}><p style={{fontSize:48}}>✨</p><p style={{marginTop:12,fontSize:16}}>Loading missions…</p></div>;
-
   const m = missions[idx % missions.length];
   const danger = time <= 8;
 
@@ -158,9 +174,12 @@ function SurviveTab({missions, xp, setXp, streak, setStreak}) {
 
       {/* Phrases */}
       {m.phrases.map((p,i)=>(
-        <div key={i} style={{background:"white",borderRadius:14,padding:"14px 16px",marginBottom:9,border:`1px solid ${C.borderLight}`,animation:`fadeUp 0.22s ease ${i*0.06}s both`}}>
-          <p style={{fontSize:18,fontWeight:600,color:C.text,marginBottom:4}}>{p.es}</p>
-          <p style={{fontSize:13,color:C.textLight}}>{p.en}</p>
+        <div key={i} style={{background:"white",borderRadius:14,padding:"14px 16px",marginBottom:9,border:`1px solid ${C.borderLight}`,animation:`fadeUp 0.22s ease ${i*0.06}s both`,display:"flex",alignItems:"center",gap:12}}>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{fontSize:18,fontWeight:600,color:C.text,marginBottom:4}}>{p.es}</p>
+            <p style={{fontSize:13,color:C.textLight}}>{p.en}</p>
+          </div>
+          <SpeakBtn text={p.es} size={36}/>
         </div>
       ))}
 
@@ -178,14 +197,18 @@ function SurviveTab({missions, xp, setXp, streak, setStreak}) {
           <div className="si">
             <div style={{background:C.yellowLight,borderRadius:14,padding:16,border:`1px solid ${C.yellow}44`,marginBottom:10}}>
               <p style={{fontSize:11,fontWeight:600,color:C.yellow,letterSpacing:"0.5px",marginBottom:8}}>SIMPLER VERSION</p>
-              <p style={{fontSize:24,fontWeight:700,color:C.text}}>{m.fallback.es}</p>
-              <p style={{fontSize:14,color:C.textMid,marginTop:5}}>{m.fallback.en}</p>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <div style={{flex:1}}>
+                  <p style={{fontSize:24,fontWeight:700,color:C.text}}>{m.fallback.es}</p>
+                  <p style={{fontSize:14,color:C.textMid,marginTop:5}}>{m.fallback.en}</p>
+                </div>
+                <SpeakBtn text={m.fallback.es} size={40}/>
+              </div>
             </div>
             <PBtn onClick={next}>Next Mission →</PBtn>
           </div>
         )}
       </div>
-
       <p style={{textAlign:"center",fontSize:12,color:C.textLight,margin:"16px 0 0"}}>
         Mission {(idx%missions.length)+1} of {missions.length} · Loops forever
       </p>
@@ -206,12 +229,13 @@ function TranslateTab({onSave}) {
     if(!input.trim())return;
     setLoading(true);setResult("");setError("");setSaved(false);
     try{const r=await translateText(input.trim(),dir);setResult(r);}
-    catch{setError("Translation failed — please check your connection and try again.");}
+    catch(e){setError("Translation failed — please check your connection and try again.");}
     setLoading(false);
   };
-
   const swap = ()=>{setDir(d=>d==="en→es"?"es→en":"en→es");setInput(result);setResult("");setSaved(false);setError("");};
   const save = ()=>{const[es,en]=dir==="en→es"?[result,input]:[input,result];onSave({es,en});setSaved(true);};
+
+  const resultLang = dir === "en→es" ? "es-ES" : "en-GB";
 
   return (
     <div style={{padding:"20px 16px 0"}}>
@@ -220,7 +244,8 @@ function TranslateTab({onSave}) {
       {/* Toggle */}
       <div style={{display:"flex",background:"white",borderRadius:12,padding:4,marginBottom:18,border:`1px solid ${C.border}`,boxShadow:C.shadow}}>
         {["en→es","es→en"].map(d=>(
-          <button key={d} onClick={()=>{setDir(d);setResult("");setError("");}} style={{flex:1,padding:"11px 6px",borderRadius:9,background:dir===d?"white":"transparent",color:dir===d?C.text:C.textLight,fontSize:13,fontWeight:dir===d?600:400,boxShadow:dir===d?C.shadow:"none",transition:"all 0.2s",border:dir===d?`1px solid ${C.border}`:"none"}}>
+          <button key={d} onClick={()=>{setDir(d);setResult("");setError("");}}
+            style={{flex:1,padding:"11px 6px",borderRadius:9,background:dir===d?"white":"transparent",color:dir===d?C.text:C.textLight,fontSize:13,fontWeight:dir===d?600:400,boxShadow:dir===d?C.shadow:"none",transition:"all 0.2s",border:dir===d?`1px solid ${C.border}`:"none"}}>
             {d==="en→es"?"🇬🇧 EN → ES 🇪🇸":"🇪🇸 ES → EN 🇬🇧"}
           </button>
         ))}
@@ -231,13 +256,10 @@ function TranslateTab({onSave}) {
         <p style={{padding:"11px 14px 0",fontSize:11,fontWeight:600,color:C.textLight,letterSpacing:"0.5px"}}>
           {dir==="en→es"?"TYPE IN ENGLISH":"ESCRIBE EN ESPAÑOL"}
         </p>
-        <textarea
-          value={input}
-          onChange={e=>{setInput(e.target.value);setResult("");setSaved(false);setError("");}}
+        <textarea value={input} onChange={e=>{setInput(e.target.value);setResult("");setSaved(false);setError("");}}
           onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();go();}}}
           placeholder={dir==="en→es"?"e.g. I need a furnished flat near the centre…":"e.g. ¿Está incluido el agua en el precio?"}
-          style={{width:"100%",minHeight:110,padding:"10px 14px 16px",background:"transparent",border:"none",outline:"none",fontSize:16,color:C.text,resize:"none",lineHeight:1.5}}
-        />
+          style={{width:"100%",minHeight:110,padding:"10px 14px 16px",background:"transparent",border:"none",outline:"none",fontSize:16,color:C.text,resize:"none",lineHeight:1.5}}/>
       </div>
 
       <PBtn onClick={go} disabled={loading||!input.trim()}>{loading?"Translating…":"Translate →"}</PBtn>
@@ -250,25 +272,30 @@ function TranslateTab({onSave}) {
 
       {result && (
         <div className="si" style={{background:C.greenLight,border:`1px solid ${C.green}44`,borderRadius:16,padding:18,marginTop:14}}>
-          <p style={{fontSize:11,fontWeight:600,color:C.green,letterSpacing:"0.5px",marginBottom:10}}>
-            {dir==="en→es"?"SPANISH":"ENGLISH"}
-          </p>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <p style={{fontSize:11,fontWeight:600,color:C.green,letterSpacing:"0.5px"}}>
+              {dir==="en→es"?"SPANISH":"ENGLISH"}
+            </p>
+            <SpeakBtn text={result} lang={resultLang} size={34}/>
+          </div>
           <p style={{fontSize:20,fontWeight:600,color:C.text,lineHeight:1.45,marginBottom:16}}>{result}</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {[
               {label:"⇄ Swap & edit",fn:swap},
               {label:"📋 Copy",fn:()=>navigator.clipboard?.writeText(result)},
             ].map(({label,fn})=>(
-              <button key={label} onClick={fn} style={{padding:"9px 14px",borderRadius:10,background:"white",border:`1px solid ${C.border}`,fontSize:13,fontWeight:500,color:C.textMid}}>{label}</button>
+              <button key={label} onClick={fn}
+                style={{padding:"9px 14px",borderRadius:10,background:"white",border:`1px solid ${C.border}`,fontSize:13,fontWeight:500,color:C.textMid}}>{label}</button>
             ))}
-            <button onClick={save} style={{padding:"9px 14px",borderRadius:10,fontSize:13,fontWeight:600,background:saved?C.green:"white",color:saved?"white":C.blue,border:`1px solid ${saved?C.green:C.blue}55`,transition:"all 0.2s"}}>
+            <button onClick={save}
+              style={{padding:"9px 14px",borderRadius:10,fontSize:13,fontWeight:600,background:saved?C.green:"white",color:saved?"white":C.blue,border:`1px solid ${saved?C.green:C.blue}55`,transition:"all 0.2s"}}>
               {saved?"✓ Saved!":"+ Add to missions"}
             </button>
           </div>
         </div>
       )}
 
-      <p style={{fontSize:12,color:C.textLight,textAlign:"center",marginTop:18}}>Press Enter to translate · Saved phrases become missions</p>
+      <p style={{fontSize:12,color:C.textLight,textAlign:"center",marginTop:18}}>Press Enter to translate · Tap 🔊 to hear it · Saved phrases become missions</p>
     </div>
   );
 }
@@ -291,13 +318,14 @@ function PhrasesTab({phrases,onDelete}) {
         <h1 style={{fontSize:24,fontWeight:700,fontFamily:"'DM Serif Display',serif",color:C.text}}>My Phrases 📖</h1>
         <Pill label={`${phrases.length} saved`} color={C.blue}/>
       </div>
-      <p style={{fontSize:13,color:C.textLight,marginBottom:16}}>These appear as a custom mission in Survive mode.</p>
+      <p style={{fontSize:13,color:C.textLight,marginBottom:16}}>These appear as a custom mission in Survive mode. Tap 🔊 to hear pronunciation.</p>
       {phrases.map((p,i)=>(
-        <div key={i} style={{background:"white",borderRadius:14,padding:"13px 14px",marginBottom:9,border:`1px solid ${C.borderLight}`,display:"flex",alignItems:"center",gap:12,animation:`fadeUp 0.22s ease ${i*0.05}s both`}}>
-          <div style={{flex:1}}>
+        <div key={i} style={{background:"white",borderRadius:14,padding:"13px 14px",marginBottom:9,border:`1px solid ${C.borderLight}`,display:"flex",alignItems:"center",gap:10,animation:`fadeUp 0.22s ease ${i*0.05}s both`}}>
+          <div style={{flex:1,minWidth:0}}>
             <p style={{fontSize:16,fontWeight:600,color:C.text}}>{p.es}</p>
             <p style={{fontSize:13,color:C.textLight,marginTop:3}}>{p.en}</p>
           </div>
+          <SpeakBtn text={p.es} size={34}/>
           <button onClick={()=>onDelete(i)} style={{width:32,height:32,borderRadius:8,background:"#FFF0EC",color:C.accent,fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
         </div>
       ))}
@@ -323,8 +351,6 @@ function ProgressTab({xp,streak,savedCount}) {
   return (
     <div style={{padding:"20px 16px 0"}}>
       <h1 style={{fontSize:24,fontWeight:700,fontFamily:"'DM Serif Display',serif",color:C.text,marginBottom:20}}>Progress ⚡</h1>
-
-      {/* XP hero */}
       <div style={{background:`linear-gradient(135deg,${C.accent},${C.accentDark})`,borderRadius:22,padding:24,marginBottom:14,color:"white",boxShadow:`0 8px 32px ${C.accent}55`}}>
         <p style={{fontSize:12,opacity:0.8,letterSpacing:"0.5px",fontWeight:500,marginBottom:4}}>TOTAL XP</p>
         <p style={{fontSize:56,fontWeight:700,lineHeight:1,fontFamily:"'DM Serif Display',serif"}}>{xp}</p>
@@ -342,7 +368,6 @@ function ProgressTab({xp,streak,savedCount}) {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
         {[{label:"Streak",val:streak,emoji:"🔥"},{label:"Level",val:level,emoji:"⭐"},{label:"Phrases",val:savedCount,emoji:"📖"}].map(({label,val,emoji})=>(
           <div key={label} style={{background:"white",borderRadius:14,padding:"16px 10px",textAlign:"center",border:`1px solid ${C.borderLight}`}}>
@@ -353,7 +378,6 @@ function ProgressTab({xp,streak,savedCount}) {
         ))}
       </div>
 
-      {/* Milestones */}
       <div style={{background:"white",borderRadius:16,padding:16,border:`1px solid ${C.borderLight}`}}>
         <p style={{fontSize:11,fontWeight:600,color:C.textLight,letterSpacing:"0.5px",marginBottom:14}}>MILESTONES</p>
         {milestones.map((m,i)=>{
@@ -381,7 +405,20 @@ export default function App() {
   const [streak,setStreak] = useState(0);
   const [saved,setSaved] = useState([]);
   const missions = getMissions(xp,saved);
-  const NAV = [{id:"survive",emoji:"⚔️",label:"Survive"},{id:"translate",emoji:"🌐",label:"Translate"},{id:"phrases",emoji:"📖",label:"Phrases"},{id:"progress",emoji:"⚡",label:"Progress"}];
+
+  // Pre-load voices so the first speak() call has Spanish ready
+  useEffect(()=>{
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  },[]);
+
+  const NAV = [
+    {id:"survive",emoji:"⚔️",label:"Survive"},
+    {id:"translate",emoji:"🌐",label:"Translate"},
+    {id:"phrases",emoji:"📖",label:"Phrases"},
+    {id:"progress",emoji:"⚡",label:"Progress"}
+  ];
 
   return (
     <div style={{minHeight:"100vh",background:C.bg,paddingBottom:76}}>
@@ -390,11 +427,13 @@ export default function App() {
       {tab==="translate"&&<TranslateTab onSave={p=>setSaved(prev=>[...prev,p])}/>}
       {tab==="phrases"&&<PhrasesTab phrases={saved} onDelete={i=>setSaved(prev=>prev.filter((_,j)=>j!==i))}/>}
       {tab==="progress"&&<ProgressTab xp={xp} streak={streak} savedCount={saved.length}/>}
+
       <nav style={{position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.96)",backdropFilter:"blur(14px)",borderTop:`1px solid ${C.border}`,display:"flex",zIndex:100}}>
         {NAV.map(({id,emoji,label})=>{
           const a=tab===id;
           return (
-            <button key={id} onClick={()=>setTab(id)} style={{flex:1,padding:"10px 4px 9px",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:a?C.accent:C.textLight,borderTop:a?`2.5px solid ${C.accent}`:"2.5px solid transparent",transition:"all 0.15s"}}>
+            <button key={id} onClick={()=>setTab(id)}
+              style={{flex:1,padding:"10px 4px 9px",background:"none",display:"flex",flexDirection:"column",alignItems:"center",gap:3,color:a?C.accent:C.textLight,borderTop:a?`2.5px solid ${C.accent}`:"2.5px solid transparent",transition:"all 0.15s"}}>
               <span style={{fontSize:21}}>{emoji}</span>
               <span style={{fontSize:10,fontWeight:a?700:400,letterSpacing:"0.3px"}}>{label}</span>
             </button>
